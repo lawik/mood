@@ -21,9 +21,10 @@ import WebKit
 // MARK: - Configuration
 
 enum ScreenTarget {
-    case main
+    case primary
     case all
     case index(Int)
+    case name(String)
 }
 
 struct Config {
@@ -45,6 +46,22 @@ private func windowLevel(named name: String) -> NSWindow.Level? {
     }
 }
 
+func listScreens() -> Never {
+    let screens = NSScreen.screens
+    if screens.isEmpty {
+        print("Overlay: no displays reported")
+        exit(0)
+    }
+    for (i, screen) in screens.enumerated() {
+        let f = screen.frame
+        let primary = (i == 0) ? "  (primary)" : ""
+        print("[\(i)] \(screen.localizedName)  "
+            + "\(Int(f.width))x\(Int(f.height)) at \(Int(f.origin.x)),\(Int(f.origin.y))"
+            + "\(primary)")
+    }
+    exit(0)
+}
+
 private let usage = """
 Overlay — transparent click-through web layer for macOS
 
@@ -53,7 +70,9 @@ Overlay — transparent click-through web layer for macOS
   --watch           reload whenever anything beside the HTML file changes
   --level <name>    shield | screensaver | menubar | floating | normal | <int>
                     default: screensaver (above the menu bar and Dock)
-  --screen <n|all>  which display to cover (default: main)
+  --screen <spec>   which displays to cover: all (the default), primary, an
+                    index, or part of a display name (case-insensitive)
+  --list-screens    print the attached displays and exit
   --tint            paint the window faintly red to verify its extent
   --help
 
@@ -64,7 +83,7 @@ func parseConfig() -> Config {
     var source: URL?
     var watch = false
     var level: NSWindow.Level = .screenSaver
-    var target: ScreenTarget = .main
+    var target: ScreenTarget = .all
     var tint = false
 
     var args = Array(CommandLine.arguments.dropFirst())
@@ -98,14 +117,16 @@ func parseConfig() -> Config {
             level = l
         case "--screen":
             let raw = value("--screen")
-            if raw.lowercased() == "all" {
-                target = .all
-            } else if let n = Int(raw) {
-                target = .index(n)
-            } else {
-                FileHandle.standardError.write("Overlay: --screen wants a number or 'all'\n".data(using: .utf8)!)
-                exit(2)
+            switch raw.lowercased() {
+            case "all":                 target = .all
+            case "primary", "main":     target = .primary
+            default:
+                // An index if it parses as one, otherwise match on display name,
+                // which survives reconnecting a projector where an index may not.
+                target = Int(raw).map(ScreenTarget.index) ?? .name(raw)
             }
+        case "--list-screens":
+            listScreens()
         case "--tint":
             tint = true
         case "--help", "-h":
@@ -272,17 +293,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func targetScreens() -> [NSScreen] {
         let all = NSScreen.screens
         guard !all.isEmpty else { return [] }
+
+        func fallback(_ why: String) -> [NSScreen] {
+            let names = all.map { $0.localizedName }.joined(separator: ", ")
+            print("Overlay: \(why); covering all displays instead (\(names))")
+            return all
+        }
+
         switch config.target {
         case .all:
             return all
-        case .main:
-            return [NSScreen.main ?? all[0]]
+        case .primary:
+            // screens[0] is the display holding the menu bar. NSScreen.main is
+            // whichever display has the active window, which for an accessory
+            // app that never takes focus is not something to rely on.
+            return [all[0]]
         case .index(let i):
-            guard i >= 0, i < all.count else {
-                print("Overlay: no display \(i), falling back to main")
-                return [NSScreen.main ?? all[0]]
-            }
+            guard i >= 0, i < all.count else { return fallback("no display at index \(i)") }
             return [all[i]]
+        case .name(let needle):
+            let matches = all.filter {
+                $0.localizedName.range(of: needle, options: .caseInsensitive) != nil
+            }
+            guard !matches.isEmpty else { return fallback("no display matching '\(needle)'") }
+            return matches
         }
     }
 

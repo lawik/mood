@@ -46,12 +46,37 @@ would add latency to every click on stage. We do not go near it.
     --url <url>       load a URL instead, e.g. a dev server on localhost
     --watch           reload when anything next to the HTML file changes
     --level <name>    shield | screensaver | menubar | floating | normal | <int>
-    --screen <n|all>  which display to cover (default: main)
+    --screen <spec>   which displays to cover: all (the default), primary, an
+                      index, or part of a display name (case-insensitive)
+    --list-screens    print the attached displays and exit
     --tint            paint the window faintly red, to verify its extent
 
 `--level screensaver` (the default) covers everything, including open menus.
 `--level menubar` (26) still covers the menu bar and Dock but lets app menus and
 context menus draw above the overlay — better if you need to drive menus live.
+
+## Displays
+
+By default the overlay covers every attached display, one window per screen.
+
+    ./run.sh --list-screens        # [0] Built-in Retina Display  1470x956 at 0,0  (primary)
+    ./run.sh --screen 1            # by index
+    ./run.sh --screen "DELL"       # by name, case-insensitive substring
+    ./run.sh --screen primary      # the display holding the menu bar
+    ./run.sh --screen all          # the default, stated explicitly
+
+Prefer selecting by name for a venue: indices shuffle when displays are
+reconnected or rearranged, names do not. A `--screen` that matches nothing falls
+back to covering all displays and says so on stdout rather than failing.
+
+`primary` means `NSScreen.screens[0]`, the display holding the menu bar — not
+`NSScreen.main`, which is whichever display has the active window and is
+meaningless for an app that never takes focus.
+
+Plugging a projector in, unplugging it, or changing resolution fires
+`didChangeScreenParametersNotification` and the windows are rebuilt against the
+new arrangement. Each display gets its own web view, so animation runs
+independently per screen — they are not frame-synced with each other.
 
 ## Pointing it at a website
 
