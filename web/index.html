@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overlay</title>
+<link rel="stylesheet" href="overlay.css">
+</head>
+<body>
+  <!-- Edge darkening. Set dressing that also makes terminal text in the
+       middle of the projection read as the focal point. -->
+  <div class="vignette"></div>
+
+  <!-- Drifting embers. -->
+  <canvas id="embers"></canvas>
+
+  <!-- One element per corner, as a geometry check: if all four brackets are
+       fully on screen, the window really does cover the whole display. -->
+  <div class="bracket tl"><span class="tick"></span></div>
+  <div class="bracket tr"><span class="tick"></span></div>
+  <div class="bracket bl"><span class="tick"></span></div>
+  <div class="bracket br"><span class="tick"></span></div>
+
+  <!-- A dot running the perimeter: unmistakable proof of animation. -->
+  <div class="runner"></div>
+
+  <div class="hud">
+    <span id="fps">— fps</span>
+    <span id="dims">—</span>
+  </div>
+
+  <script src="overlay.js"></script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+:root {
+  --amber: 255 179 71;
+  --teal:  79 214 200;
+  --inset: 0px;    /* flush to the screen edge, so the brackets prove full-bleed coverage */
+  --arm:   84px;
+  --hair:  2px;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;   /* paired with the window's clear backgroundColor */
+}
+
+/* The window is already out of hit-testing; this just documents the intent. */
+* { pointer-events: none; user-select: none; }
+
+.vignette {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse 78% 72% at 50% 50%,
+              rgb(0 0 0 / 0) 42%, rgb(6 4 12 / 0.55) 100%);
+}
+
+#embers {
+  position: fixed;
+  inset: 0;
+  mix-blend-mode: screen;
+}
+
+/* ---- Corner brackets ---- */
+
+.bracket {
+  position: fixed;
+  width: var(--arm);
+  height: var(--arm);
+  border: 0 solid rgb(var(--amber) / 0.85);
+  filter: drop-shadow(0 0 8px rgb(var(--amber) / 0.55));
+  animation: breathe 3.2s ease-in-out infinite;
+}
+
+.tl { top: var(--inset);    left: var(--inset);  border-top-width: var(--hair); border-left-width:  var(--hair); animation-delay: 0s;    }
+.tr { top: var(--inset);    right: var(--inset); border-top-width: var(--hair); border-right-width: var(--hair); animation-delay: 0.8s;  }
+.bl { bottom: var(--inset); left: var(--inset);  border-bottom-width: var(--hair); border-left-width:  var(--hair); animation-delay: 1.6s; }
+.br { bottom: var(--inset); right: var(--inset); border-bottom-width: var(--hair); border-right-width: var(--hair); animation-delay: 2.4s; }
+
+/* A second, offset mark inside each bracket, on its own rhythm. */
+.tick {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: rgb(var(--teal) / 0.9);
+  box-shadow: 0 0 12px rgb(var(--teal) / 0.8);
+  animation: blink 2.1s steps(1, end) infinite;
+}
+.tl .tick { top: 10px;    left: 10px;  }
+.tr .tick { top: 10px;    right: 10px; animation-delay: 0.5s; }
+.bl .tick { bottom: 10px; left: 10px;  animation-delay: 1.0s; }
+.br .tick { bottom: 10px; right: 10px; animation-delay: 1.5s; }
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.94); }
+  50%      { opacity: 1;    transform: scale(1);    }
+}
+
+@keyframes blink {
+  0%, 44%  { opacity: 0.15; }
+  45%, 60% { opacity: 1;    }
+  61%      { opacity: 0.15; }
+}
+
+/* ---- Perimeter runner ---- */
+
+.runner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 46px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg,
+              rgb(var(--teal) / 0), rgb(var(--teal) / 1), rgb(var(--teal) / 0));
+  filter: drop-shadow(0 0 10px rgb(var(--teal) / 0.9));
+  will-change: transform;
+}
+
+/* ---- Readout ---- */
+
+.hud {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 18px;
+  font: 500 12px/1 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.12em;
+  color: rgb(var(--amber) / 0.75);
+  text-shadow: 0 0 10px rgb(var(--amber) / 0.4);
+}
