@@ -73,10 +73,10 @@ Info.plist in `build.sh`.
 
 Each directory under `web/` is a scene, and `run.sh <name>` picks one.
 
-- **leaves** (default) — opaque foliage clustered in the four corners with a few
-  errant leaves drifting in the open, motes of light hovering like insects, and
-  a slow firelight pulse from below the frame. Leaves stay in a black-to-green
-  range: the fire never recolours them, it catches their edges.
+- **leaves** (default) — opaque foliage clustered in the four corners, motes of
+  light hovering like insects, and a slow firelight pulse from below the frame.
+  Leaves stay dark, in a black-to-green range; the firelight lifts them slightly
+  within that range and never recolours them towards orange.
 - **embers** — the original corner-bracket test card. Four flush corner markers,
   drifting embers and a perimeter runner. Useful for confirming the window
   really does cover the whole display.
@@ -84,7 +84,7 @@ Each directory under `web/` is a scene, and `run.sh <name>` picks one.
 Scene knobs worth reaching for first, all near the top of `leaves.js`:
 `LAYERS` (colour, size, density and sway per depth), `ANCHORS` (where the corner
 clusters attach), `LIGHTS` (position and pulse rate of the fire), and the mote
-and stray counts in `rebuild()`. `SEED` is fixed, so the composition is stable
+count in `rebuild()`. `SEED` is fixed, so the composition is stable
 across reloads — change it to deal a different arrangement.
 
 ## Writing the content

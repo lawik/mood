@@ -15,14 +15,12 @@
   var W = 0, H = 0, DPR = 1;
   var branches = [];
   var motes = [];
-  var strays = [];
-  var palettes = [];
   var moteSprite = null;
 
   // Leaves are shadows: firelight lifts them within a black -> green range and
   // never towards orange. The fire's own colour lives in the ambient pools and
   // the motes, not on the foliage.
-  var LIT = [56, 110, 62];
+  var LIT = [30, 62, 36];
   var SEED = 20260920;           // fixed, so live-reloading does not reshuffle the set
 
   // Back to front. Nearer foliage is bigger, darker and sways more; the distant
@@ -30,9 +28,9 @@
   // tintMax caps how far firelight can pull a leaf towards orange. Leaving it
   // uncapped turns the whole canopy autumnal; these stay green and black, warmed.
   var LAYERS = [
-    { base: [34, 68, 40], jitter: 14, scale: 0.62, leafScale: 0.85, density: 0.85, sway: 0.018, swaySpeed: 0.21, light: 0.50, tintMax: 0.45, rib: true  },
-    { base: [16, 38, 22], jitter: 10, scale: 0.85, leafScale: 1.10, density: 0.70, sway: 0.025, swaySpeed: 0.29, light: 0.80, tintMax: 0.38, rib: true  },
-    { base: [ 9, 18, 12], jitter:  5, scale: 1.15, leafScale: 1.45, density: 0.55, sway: 0.034, swaySpeed: 0.37, light: 1.00, tintMax: 0.26, rib: false }
+    { base: [19, 40, 24], jitter:  9, scale: 0.62, leafScale: 0.85, density: 0.85, sway: 0.018, swaySpeed: 0.21, light: 0.50, tintMax: 0.35, rib: true  },
+    { base: [10, 24, 14], jitter:  6, scale: 0.85, leafScale: 1.10, density: 0.70, sway: 0.025, swaySpeed: 0.29, light: 0.80, tintMax: 0.30, rib: true  },
+    { base: [ 3,  6,  4], jitter:  3, scale: 1.15, leafScale: 1.45, density: 0.55, sway: 0.034, swaySpeed: 0.37, light: 1.00, tintMax: 0.22, rib: false }
   ];
 
   // Anchors live just off-screen and grow inward, so foliage reads as intruding
@@ -44,9 +42,9 @@
   // Four corner clusters, anchored just off-frame and growing diagonally in.
   // Nothing along the edges or the top centre: the middle of the screen is
   // where the work being projected has to stay readable.
-  // Three short stubs per corner, anchored just off-frame and growing
-  // diagonally in. Nothing along the edges or the top centre: the middle of the
-  // screen is where the work being projected has to stay readable.
+  // Three short stubs per corner, plus a fringe hanging down off the top edge.
+  // The sides and the lower middle stay clear: that is where the work being
+  // projected has to stay readable.
   var ANCHORS = [
     { x: -0.08, y: -0.05, a:   38, len: 0.26 },   // top left
     { x: -0.01, y: -0.11, a:   58, len: 0.22 },
@@ -54,6 +52,13 @@
     { x:  1.08, y: -0.05, a:  142, len: 0.26 },   // top right
     { x:  1.01, y: -0.11, a:  122, len: 0.22 },
     { x:  1.12, y:  0.08, a:  160, len: 0.19 },
+    { x:  0.19, y: -0.13, a:   82, len: 0.28 },   // along the top, hanging down
+    { x:  0.29, y: -0.17, a:   95, len: 0.20 },
+    { x:  0.40, y: -0.11, a:   87, len: 0.31 },
+    { x:  0.50, y: -0.16, a:   99, len: 0.22 },
+    { x:  0.61, y: -0.12, a:   84, len: 0.29 },
+    { x:  0.72, y: -0.17, a:   93, len: 0.19 },
+    { x:  0.83, y: -0.12, a:   90, len: 0.26 },
     { x: -0.08, y:  1.05, a:  -38, len: 0.24 },   // bottom left
     { x: -0.01, y:  1.11, a:  -58, len: 0.21 },
     { x: -0.12, y:  0.92, a:  -20, len: 0.18 },
@@ -148,33 +153,6 @@
     };
   }
 
-  // Biased outwards, but a few are allowed to wander into the open.
-  function strayPos(rnd) {
-    var x = rnd(), y = rnd();
-    if (rnd() < 0.65) {
-      if (rnd() < 0.5) x = rnd() < 0.5 ? rnd() * 0.28 : 0.72 + rnd() * 0.28;
-      else             y = rnd() < 0.5 ? rnd() * 0.26 : 0.74 + rnd() * 0.26;
-    }
-    return { x: x, y: y };
-  }
-
-  function makeStray(rnd) {
-    var pos = strayPos(rnd);
-    return {
-      x: pos.x,
-      y: pos.y,
-      size: (0.055 + rnd() * 0.045) * Math.min(W, H),
-      width: 0.24 + rnd() * 0.12,
-      angle: rnd() * 6.283,
-      spin: 0.05 + rnd() * 0.10,
-      bobR: 3 + rnd() * 9,
-      bobF: 0.07 + rnd() * 0.16,
-      bobP: rnd() * 6.283,
-      rib: rnd() < 0.5,
-      palette: palettes[Math.floor(rnd() * palettes.length)]
-    };
-  }
-
   function makeMote(rnd) {
     return {
       hx: rnd(),
@@ -211,12 +189,10 @@
   function rebuild() {
     var rnd = rng(SEED);
     branches = [];
-    palettes = [];
 
     for (var li = 0; li < LAYERS.length; li++) {
       var layer = LAYERS[li];
       var palette = buildPalette(layer, rnd);
-      if (li > 0) palettes.push(palette[0]);
       for (var ai = 0; ai < ANCHORS.length; ai++) {
         if (rnd() > layer.density) continue;
         var spec = ANCHORS[ai];
@@ -228,9 +204,6 @@
         }, layer, palette, rnd));
       }
     }
-
-    strays = [];
-    for (var s = 0; s < 8; s++) strays.push(makeStray(rnd));
 
     motes = [];
     for (var m = 0; m < 30; m++) motes.push(makeMote(rnd));
@@ -275,16 +248,11 @@
   }
 
   // A bare blade reads as a pebble; the stalk and midrib are what make it a leaf.
-  function drawLeaf(len, wid, color, rib, rim) {
+  function drawLeaf(len, wid, color, rib) {
     ctx.fillStyle = color;
     leafPath(len, wid);
     ctx.fill();
 
-    if (rim > 0.02) {
-      ctx.strokeStyle = 'rgba(255, 150, 62, ' + rim.toFixed(3) + ')';
-      ctx.lineWidth = Math.max(1, len * 0.016);
-      ctx.stroke();              // the blade path is still current after fill()
-    }
 
     ctx.strokeStyle = color;
     ctx.lineWidth = Math.max(1, len * 0.035);
@@ -345,7 +313,7 @@
       ctx.translate(p.x, p.y);
       ctx.rotate(Math.atan2(p.ay, p.ax) + leaf.angle +
                  Math.sin(t * leaf.flutterRate + leaf.flutter) * 0.07);
-      drawLeaf(leaf.size, leaf.width, leaf.palette[step], b.layer.rib, lit * 0.60);
+      drawLeaf(leaf.size, leaf.width, leaf.palette[step], b.layer.rib);
       ctx.restore();
     }
 
@@ -371,22 +339,6 @@
       ctx.drawImage(moteSprite, x - size / 2, y - size / 2, size, size);
     }
     ctx.globalAlpha = 1;
-  }
-
-  function drawStrays(t) {
-    for (var i = 0; i < strays.length; i++) {
-      var s = strays[i];
-      var x = s.x * W;
-      var y = s.y * H + Math.sin(t * s.bobF * 6.283 + s.bobP) * s.bobR;
-      var lit = 1 - Math.exp(-lightAt(x, y) * 0.8 * 1.25);
-      var step = (lit * 0.34 * TINT_STEPS) | 0;
-
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(s.angle + Math.sin(t * s.bobF * 4.1 + s.bobP) * s.spin);
-      drawLeaf(s.size, s.width, s.palette[step], s.rib, lit * 0.52);
-      ctx.restore();
-    }
   }
 
   function drawAmbient() {
@@ -432,7 +384,6 @@
     for (i = 0; i < branches.length; i++) {
       if (branches[i].layer === LAYERS[1]) drawBranch(branches[i], t);
     }
-    drawStrays(t);
     drawMotes(t, false);
     for (i = 0; i < branches.length; i++) {
       if (branches[i].layer === LAYERS[2]) drawBranch(branches[i], t);
