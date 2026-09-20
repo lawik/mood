@@ -118,8 +118,8 @@ func parseConfig() -> Config {
     }
 
     let resolved = source
-        ?? Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "web")
-        ?? URL(fileURLWithPath: "web/index.html").standardizedFileURL
+        ?? Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "web/leaves")
+        ?? URL(fileURLWithPath: "web/leaves/index.html").standardizedFileURL
 
     return Config(source: resolved,
                   watchRoot: (watch && resolved.isFileURL) ? resolved.deletingLastPathComponent() : nil,
@@ -205,6 +205,17 @@ final class OverlaySurface {
         } else {
             webView.load(URLRequest(url: config.source))
         }
+    }
+
+    /// A plain re-load re-fetches the HTML but serves CSS and JS out of
+    /// WebKit's cache, so edits appear to do nothing. Clearing the cache first
+    /// is what makes --watch actually live.
+    func reload(_ config: Config) {
+        let types: Set<String> = [WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeDiskCache]
+        webView.configuration.websiteDataStore
+            .removeData(ofTypes: types, modifiedSince: .distantPast) { [weak self] in
+                self?.load(config)
+            }
     }
 
     func show() {
@@ -311,7 +322,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func reload() {
-        surfaces.forEach { $0.load(config) }
+        surfaces.forEach { $0.reload(config) }
     }
 
     @objc private func toggleVisible(_ sender: NSMenuItem) {

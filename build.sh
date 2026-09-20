@@ -6,6 +6,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP="$ROOT/build/Overlay.app"
 ARCH="$(uname -m)"
 
+# Rebuilding deletes the bundle out from under a running instance.
+if pgrep -f "Overlay.app/Contents/MacOS/Overlay" >/dev/null 2>&1; then
+  echo "build.sh: stopping the running overlay first"
+  pkill -f "Overlay.app/Contents/MacOS/Overlay" || true
+  sleep 1
+fi
+
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 

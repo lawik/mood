@@ -5,7 +5,8 @@ Built for stage use: the projected desktop stays fully usable — terminals,
 editors, whatever — while this draws set dressing on top of it.
 
     ./build.sh      # compiles build/Overlay.app with swiftc (no Xcode project)
-    ./run.sh        # runs it against web/, with live reload; Ctrl-C quits
+    ./run.sh        # runs the default scene with live reload; Ctrl-C quits
+    ./run.sh embers # runs a named scene from web/
 
 Also quits from the `◆` menu bar item, which offers Reload and Hide too.
 
@@ -67,6 +68,24 @@ overlay — only pages that are deliberately transparent work as set dressing.
 And App Transport Security allows https anywhere and http on localhost; plain
 http to another host is blocked unless `NSAllowsArbitraryLoads` is added to the
 Info.plist in `build.sh`.
+
+## Scenes
+
+Each directory under `web/` is a scene, and `run.sh <name>` picks one.
+
+- **leaves** (default) — opaque foliage clustered in the four corners with a few
+  errant leaves drifting in the open, motes of light hovering like insects, and
+  a slow firelight pulse from below the frame. Leaves stay in a black-to-green
+  range: the fire never recolours them, it catches their edges.
+- **embers** — the original corner-bracket test card. Four flush corner markers,
+  drifting embers and a perimeter runner. Useful for confirming the window
+  really does cover the whole display.
+
+Scene knobs worth reaching for first, all near the top of `leaves.js`:
+`LAYERS` (colour, size, density and sway per depth), `ANCHORS` (where the corner
+clusters attach), `LIGHTS` (position and pulse rate of the fire), and the mote
+and stray counts in `rebuild()`. `SEED` is fixed, so the composition is stable
+across reloads — change it to deal a different arrangement.
 
 ## Writing the content
 
