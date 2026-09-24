@@ -154,6 +154,12 @@ Info.plist in `build.sh`.
 scener's LiveView at `http://localhost:4040/overlay`, so scene state and the set
 dressing are driven by one process. `OVERLAY_URL` points it elsewhere.
 
+**A page that fails to load keeps retrying** rather than sitting on a WebKit
+error page for the rest of the night. Start the overlay before the runner, or
+restart the runner mid-rehearsal, and the page comes back on its own within a
+few seconds. The failure is logged once, not once per attempt. Same reasoning as
+the key tap's reconnect: the order you start things in should not matter.
+
 The leaves used to be a local page here and now live in scener, which owns the
 animation, the scene indicator and anything else that reacts to a cue. Nothing
 is bundled in the `.app` any more: this is a chrome-less window and a key tap,

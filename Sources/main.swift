@@ -212,9 +212,17 @@ final class OverlayPanel: NSPanel {
     override var acceptsFirstResponder: Bool { false }
 }
 
-final class OverlaySurface {
+final class OverlaySurface: NSObject, WKNavigationDelegate {
     let panel: OverlayPanel
     let webView: WKWebView
+
+    // The scene runner may not be up yet, or may restart mid-rehearsal. A page
+    // that failed to load once should not stay a WebKit error page for the rest
+    // of the night, so failures retry until they stop failing. Same reasoning as
+    // the key tap's reconnect: start order should not matter.
+    private var source: Config?
+    private var retryDelay: TimeInterval = 0.5
+    private var retrying = false
 
     init(screen: NSScreen, config: Config) {
         let wkConfig = WKWebViewConfiguration()
@@ -270,9 +278,14 @@ final class OverlaySurface {
 
         panel.contentView = webView
         panel.setFrame(screen.frame, display: true)
+
+        super.init()
     }
 
     func load(_ config: Config) {
+        source = config
+        webView.navigationDelegate = self
+
         if config.source.isFileURL {
             webView.loadFileURL(config.source,
                                 allowingReadAccessTo: config.source.deletingLastPathComponent())
@@ -290,6 +303,45 @@ final class OverlaySurface {
             .removeData(ofTypes: types, modifiedSince: .distantPast) { [weak self] in
                 self?.load(config)
             }
+    }
+
+    // MARK: Retrying
+
+    func webView(_ webView: WKWebView,
+                 didFailProvisionalNavigation navigation: WKNavigation!,
+                 withError error: Error) {
+        retry(after: error)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        retry(after: error)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if retrying {
+            print("Overlay: page loaded")
+            retrying = false
+        }
+        retryDelay = 0.5
+    }
+
+    private func retry(after error: Error) {
+        // -999 is a navigation we cancelled ourselves by starting another one.
+        // Retrying on that would chase its own tail.
+        if (error as NSError).code == NSURLErrorCancelled { return }
+        guard let config = source else { return }
+
+        if !retrying {
+            print("Overlay: \(config.source.absoluteString) did not load "
+                + "(\(error.localizedDescription)); retrying until it does")
+            retrying = true
+        }
+
+        let delay = retryDelay
+        retryDelay = min(retryDelay * 2, 5)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.load(config)
+        }
     }
 
     func show() {
