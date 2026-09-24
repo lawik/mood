@@ -47,10 +47,6 @@ swiftc \
   "$ROOT"/Sources/*.swift \
   -o "$STAGE/Contents/MacOS/Overlay"
 
-# Ship a copy of the page so the .app runs standalone; ./run.sh points at the
-# working copy in web/ instead, for live reload.
-cp -R "$ROOT/web" "$STAGE/Contents/Resources/web"
-
 # Sign with a real identity when one exists. This matters for --capture-keys:
 # macOS records an Accessibility grant against the app's designated requirement,
 # and an ad-hoc signature has no stable identity, so its requirement pins the

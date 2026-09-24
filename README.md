@@ -5,8 +5,7 @@ Built for stage use: the projected desktop stays fully usable — terminals,
 editors, whatever — while this draws set dressing on top of it.
 
     ./build.sh      # compiles build/Overlay.app with swiftc (no Xcode project)
-    ./run.sh        # shows scener's overlay at localhost:4000; Ctrl-C quits
-    ./run.sh embers # a local page from web/ instead, with live reload
+    ./run.sh        # the whole thing: scener's overlay + key capture
 
 Also quits from the `◆` menu bar item, which offers Reload and Hide too.
 
@@ -90,11 +89,13 @@ them to a scene runner as newline-delimited JSON over TCP (default
 `127.0.0.1:4040`). An actor taps any keys; the runner decides what actually gets
 typed.
 
-    ./run.sh --capture-keys
+    ./run.sh                    # capture is on by default
     ./run.sh --check-permission
 
-This is the only part that needs Accessibility permission. Without the flag the
-overlay still needs nothing at all.
+**Missing permission is fatal.** The app exits rather than drawing an overlay
+that looks right while silently ignoring every key, and `run.sh` checks before
+it draws anything at all. That failure would otherwise only surface once the
+show had started.
 
 | | |
 |---|---|
@@ -150,21 +151,17 @@ Info.plist in `build.sh`.
 
 ## Where the visuals come from
 
-By default the overlay loads **scener's LiveView** at
-`http://localhost:4000/overlay`, so scene state and the set dressing are driven
-by one process. `OVERLAY_URL` points it somewhere else.
+scener's LiveView at `http://localhost:4000/overlay`, so scene state and the set
+dressing are driven by one process. `OVERLAY_URL` points it elsewhere.
 
-The leaves used to live here as a local page and now live in scener, which owns
-the animation, the scene indicator and everything else that reacts to a cue.
+The leaves used to be a local page here and now live in scener, which owns the
+animation, the scene indicator and anything else that reacts to a cue. Nothing
+is bundled in the `.app` any more: this is a chrome-less window and a key tap,
+and the visuals belong with the scenes.
 
-What remains under `web/` is local pages that need no server at all:
-
-- **embers** — a test card. Four flush corner markers, drifting embers and a
-  perimeter runner. The quickest way to confirm the window really does cover the
-  whole display, with nothing else running.
-
-`./run.sh <name>` shows one, with live reload. They are also what the `.app`
-falls back to when launched on its own with no `--url`.
+`--file` still takes a local page if you want one. To check the window really
+covers the whole display without anything else running, `--tint` paints it
+faintly red, which is a better test than any page.
 
 
 ## Writing the content

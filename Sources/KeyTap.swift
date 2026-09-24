@@ -88,20 +88,22 @@ final class KeyTap {
 
     // MARK: Lifecycle
 
-    func start() {
+    @discardableResult
+    func start() -> Bool {
         guard requestAccessibility() else {
             print("""
                   Overlay: key capture needs Accessibility permission.
                   Grant it in System Settings > Privacy & Security > Accessibility,
-                  add build/Overlay.app, then run again.
+                  add \(Bundle.main.bundlePath), then run again.
                   """)
-            return
+            return false
         }
         connect()
         let thread = Thread { [weak self] in self?.runTapLoop() }
         thread.name = "se.underjord.overlay.keytap"
         thread.qualityOfService = .userInteractive
         thread.start()
+        return true
     }
 
     func setEnabled(_ on: Bool) {
@@ -137,8 +139,10 @@ final class KeyTap {
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
+            // Fatal for the same reason: a tap that never armed would leave the
+            // overlay looking healthy and deaf.
             print("Overlay: could not create the key tap (permission refused?)")
-            return
+            exit(1)
         }
 
         machPort = tap

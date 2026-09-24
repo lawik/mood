@@ -63,11 +63,13 @@ func listScreens() -> Never {
     exit(0)
 }
 
+let defaultOverlayURL = "http://localhost:4000/overlay"
+
 private let usage = """
 Overlay — transparent click-through web layer for macOS
 
-  --file <path>     local HTML file to display (default: bundled web/index.html)
-  --url <url>       load a URL instead (e.g. a dev server on http://localhost:5173)
+  --url <url>       page to display (default: http://localhost:4000/overlay)
+  --file <path>     a local HTML file instead of a URL
   --watch           reload whenever anything beside the HTML file changes
   --level <name>    shield | screensaver | menubar | floating | normal | <int>
                     default: screensaver (above the menu bar and Dock)
@@ -188,9 +190,9 @@ func parseConfig() -> Config {
         }
     }
 
-    let resolved = source
-        ?? Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "web/embers")
-        ?? URL(fileURLWithPath: "web/embers/index.html").standardizedFileURL
+    // The overlay is scener's LiveView. There is no bundled page: this app is a
+    // chrome-less window and a key tap, and the visuals belong with the scenes.
+    let resolved = source ?? URL(string: defaultOverlayURL)!
 
     return Config(source: resolved,
                   watchRoot: (watch && resolved.isFileURL) ? resolved.deletingLastPathComponent() : nil,
@@ -322,6 +324,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // No Dock icon, no menu bar of its own, never becomes frontmost.
         NSApp.setActivationPolicy(.accessory)
 
+        if let capture = config.captureKeys {
+            let tap = KeyTap(host: capture.host, port: capture.port)
+            tap.onStateChange = { [weak self] active in
+                self?.captureItem?.title = active ? "Key capture: ON" : "Key capture: idle"
+            }
+            // Refuse to run half-armed. An overlay that looks right while
+            // silently ignoring the actor's keys is worse than one that does
+            // not start, and it would only be noticed once the show began.
+            guard tap.start() else { exit(1) }
+            keyTap = tap
+        }
+
         rebuildSurfaces()
         installStatusItem()
 
@@ -330,15 +344,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             selector: #selector(screenParametersChanged),
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil)
-
-        if let capture = config.captureKeys {
-            let tap = KeyTap(host: capture.host, port: capture.port)
-            tap.onStateChange = { [weak self] active in
-                self?.captureItem?.title = active ? "Key capture: ON" : "Key capture: idle"
-            }
-            tap.start()
-            keyTap = tap
-        }
 
         if let root = config.watchRoot {
             lastSeenChange = Self.newestModification(under: root)
