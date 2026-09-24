@@ -189,8 +189,8 @@ func parseConfig() -> Config {
     }
 
     let resolved = source
-        ?? Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "web/leaves")
-        ?? URL(fileURLWithPath: "web/leaves/index.html").standardizedFileURL
+        ?? Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "web/embers")
+        ?? URL(fileURLWithPath: "web/embers/index.html").standardizedFileURL
 
     return Config(source: resolved,
                   watchRoot: (watch && resolved.isFileURL) ? resolved.deletingLastPathComponent() : nil,

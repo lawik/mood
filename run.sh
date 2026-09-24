@@ -1,27 +1,37 @@
 #!/usr/bin/env bash
-# Runs a scene from web/ in the foreground, with live reload. Ctrl-C quits.
+# Runs the overlay in the foreground. Ctrl-C quits.
 #
-#   ./run.sh                 # the default scene
-#   ./run.sh embers          # a named scene from web/
-#   ./run.sh leaves --tint   # scene plus any Overlay flags
+#   ./run.sh                 # scener's LiveView overlay (the default)
+#   ./run.sh embers          # a local scene from web/, with live reload
+#   ./run.sh --tint          # default overlay plus any Overlay flags
 #   ./run.sh --capture-keys  # key tap on (launched via LaunchServices, see below)
 #   ./run.sh --check-permission
+#
+# The leaves live in scener now, as a LiveView, so scene state and the set
+# dressing come from one place. OVERLAY_URL overrides where that is.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP="$ROOT/build/Overlay.app"
 BIN="$APP/Contents/MacOS/Overlay"
-SCENE="leaves"
+OVERLAY_URL="${OVERLAY_URL:-http://localhost:4000/overlay}"
 
+SCENE=""
 if [[ $# -gt 0 && "$1" != -* ]]; then
   SCENE="$1"
   shift
 fi
 
-if [[ ! -f "$ROOT/web/$SCENE/index.html" ]]; then
-  echo "run.sh: no scene '$SCENE'. Available:" >&2
-  for d in "$ROOT"/web/*/; do [[ -f "$d/index.html" ]] && echo "  $(basename "$d")" >&2; done
-  exit 1
+if [[ -n "$SCENE" ]]; then
+  if [[ ! -f "$ROOT/web/$SCENE/index.html" ]]; then
+    echo "run.sh: no local scene '$SCENE'. Available:" >&2
+    for d in "$ROOT"/web/*/; do [[ -f "$d/index.html" ]] && echo "  $(basename "$d")" >&2; done
+    echo "  (with no argument, the overlay comes from $OVERLAY_URL)" >&2
+    exit 1
+  fi
+  SOURCE=(--file "$ROOT/web/$SCENE/index.html" --watch)
+else
+  SOURCE=(--url "$OVERLAY_URL")
 fi
 
 [[ -x "$BIN" ]] || "$ROOT/build.sh"
@@ -41,7 +51,7 @@ for arg in "$@"; do
 done
 
 if ! $via_launchservices; then
-  exec "$BIN" --file "$ROOT/web/$SCENE/index.html" --watch "$@"
+  exec "$BIN" "${SOURCE[@]}" "$@"
 fi
 
 LOG="/tmp/overlay-$USER.log"
@@ -62,5 +72,4 @@ trap cleanup INT TERM EXIT
 tail -f "$LOG" &
 TAIL_PID=$!
 
-open -n -W --stdout "$LOG" --stderr "$LOG" \
-  -a "$APP" --args --file "$ROOT/web/$SCENE/index.html" --watch "$@"
+open -n -W --stdout "$LOG" --stderr "$LOG" -a "$APP" --args "${SOURCE[@]}" "$@"

@@ -5,8 +5,8 @@ Built for stage use: the projected desktop stays fully usable — terminals,
 editors, whatever — while this draws set dressing on top of it.
 
     ./build.sh      # compiles build/Overlay.app with swiftc (no Xcode project)
-    ./run.sh        # runs the default scene with live reload; Ctrl-C quits
-    ./run.sh embers # runs a named scene from web/
+    ./run.sh        # shows scener's overlay at localhost:4000; Ctrl-C quits
+    ./run.sh embers # a local page from web/ instead, with live reload
 
 Also quits from the `◆` menu bar item, which offers Reload and Hide too.
 
@@ -148,23 +148,24 @@ And App Transport Security allows https anywhere and http on localhost; plain
 http to another host is blocked unless `NSAllowsArbitraryLoads` is added to the
 Info.plist in `build.sh`.
 
-## Scenes
+## Where the visuals come from
 
-Each directory under `web/` is a scene, and `run.sh <name>` picks one.
+By default the overlay loads **scener's LiveView** at
+`http://localhost:4000/overlay`, so scene state and the set dressing are driven
+by one process. `OVERLAY_URL` points it somewhere else.
 
-- **leaves** (default) — opaque foliage clustered in the four corners, motes of
-  light hovering like insects, and a slow firelight pulse from below the frame.
-  Leaves stay dark, in a black-to-green range; the firelight lifts them slightly
-  within that range and never recolours them towards orange.
-- **embers** — the original corner-bracket test card. Four flush corner markers,
-  drifting embers and a perimeter runner. Useful for confirming the window
-  really does cover the whole display.
+The leaves used to live here as a local page and now live in scener, which owns
+the animation, the scene indicator and everything else that reacts to a cue.
 
-Scene knobs worth reaching for first, all near the top of `leaves.js`:
-`LAYERS` (colour, size, density and sway per depth), `ANCHORS` (where the corner
-clusters attach), `LIGHTS` (position and pulse rate of the fire), and the mote
-count in `rebuild()`. `SEED` is fixed, so the composition is stable
-across reloads — change it to deal a different arrangement.
+What remains under `web/` is local pages that need no server at all:
+
+- **embers** — a test card. Four flush corner markers, drifting embers and a
+  perimeter runner. The quickest way to confirm the window really does cover the
+  whole display, with nothing else running.
+
+`./run.sh <name>` shows one, with live reload. They are also what the `.app`
+falls back to when launched on its own with no `--url`.
+
 
 ## Writing the content
 
