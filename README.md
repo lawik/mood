@@ -28,10 +28,15 @@ Everything rests on a borderless, non-activating `NSPanel`:
 
 `ignoresMouseEvents` takes the window out of hit-testing altogether, so mouse,
 scroll and gesture events are delivered to whatever sits underneath as if the
-overlay were not there. **No permissions are required** — not Accessibility, not
-Input Monitoring, not Screen Recording. The alternative approach, tapping events
-with `CGEventTap` and re-posting them, would need Accessibility approval and
-would add latency to every click on stage. We do not go near it.
+overlay were not there. **The overlay itself requires no permissions** — not
+Accessibility, not Input Monitoring, not Screen Recording. The alternative for
+clicks, tapping events with `CGEventTap` and re-posting them, would need
+Accessibility approval and would add latency to every click on stage. We do not
+go near it: mouse events are never tapped.
+
+Keyboard is the exception, and only on request. `--capture-keys` does use a
+`CGEventTap`, because intercepting keystrokes is the entire point of it. See
+[Key capture](#key-capture); without that flag none of it is active.
 
 ### Two traps worth remembering
 
@@ -77,6 +82,49 @@ Plugging a projector in, unplugging it, or changing resolution fires
 `didChangeScreenParametersNotification` and the windows are rebuilt against the
 new arrangement. Each display gets its own web view, so animation runs
 independently per screen — they are not frame-synced with each other.
+
+## Key capture
+
+`--capture-keys [host:port]` makes the overlay swallow key presses and forward
+them to a scene runner as newline-delimited JSON over TCP (default
+`127.0.0.1:4040`). An actor taps any keys; the runner decides what actually gets
+typed.
+
+    ./run.sh --capture-keys
+    ./run.sh --check-permission
+
+This is the only part that needs Accessibility permission. Without the flag the
+overlay still needs nothing at all.
+
+| | |
+|---|---|
+| **Escape** | disables capture. The panic key: never swallowed, works always. |
+| **Command-Escape** | re-enables capture. |
+| **Command / Control** | never swallowed, so Cmd-Tab, Cmd-Q and the menu bar always work. |
+
+Two gestures rather than one toggle, so the resulting state never depends on
+what the state was — worth something when you are reaching for it in a hurry.
+Command-Escape is the single Command combination that does not pass through,
+since it is the overlay's own control gesture.
+
+Keys are only swallowed **while the runner is connected**. If the runner dies or
+was never started, every key passes through untouched — a tap that suppressed
+everything with nothing listening would leave you unable to type the command
+that would fix it. The two can be started in either order; the overlay retries
+until the runner appears.
+
+### Why run.sh uses `open` for this
+
+macOS attributes Accessibility to the *responsible process*, and a binary
+exec'd from a terminal is attributed to the terminal, not to the app. Adding
+`Overlay.app` under Privacy & Security would then never apply and the tap would
+silently do nothing. So `run.sh` launches through LaunchServices for
+`--capture-keys` and `--check-permission`, which makes the app responsible for
+itself. Plain scene runs still exec directly.
+
+`build.sh` signs with a real codesigning identity when one exists, which keeps
+the grant across rebuilds. An ad-hoc signature pins the requirement to the
+cdhash, so every rebuild looks like a different app and the permission resets.
 
 ## Pointing it at a website
 

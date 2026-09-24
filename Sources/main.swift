@@ -78,8 +78,8 @@ Overlay — transparent click-through web layer for macOS
   --capture-keys [host:port]
                     swallow key presses and forward them to a scene runner
                     (default 127.0.0.1:4040). Needs Accessibility permission.
-                    Keys only get swallowed while the runner is connected;
-                    Escape always passes through and disables capture.
+                    Keys only get swallowed while the runner is connected.
+                    Escape disables capture; Command-Escape re-enables it.
   --check-permission
                     report whether Accessibility is granted, and exit
   --help
@@ -436,7 +436,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleCapture() {
         guard let keyTap else { return }
-        keyTap.setEnabled(!keyTap.isCapturing)
+        keyTap.setEnabled(!keyTap.isEnabled)
     }
 
     @objc private func quit() {

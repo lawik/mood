@@ -14,7 +14,8 @@
 //    2. Command and Control are never touched, so Cmd-Tab, Cmd-Q and the menu
 //       bar always work.
 //    3. Escape is never swallowed and always disables capture. It is the panic
-//       key, and it is worth knowing before you need it.
+//       key, and it is worth knowing before you need it. Command-Escape turns
+//       capture back on.
 //
 //  The tap also runs its own thread and run loop. Sharing the main run loop with
 //  WKWebView means a render stall can trip kCGEventTapDisabledByTimeout, and
@@ -73,7 +74,12 @@ final class KeyTap {
     /// Called on the main queue whenever capture starts or stops, for the menu.
     var onStateChange: ((Bool) -> Void)?
 
+    /// Capture is actually swallowing keys: the operator wants it on *and* the
+    /// runner is there to receive them.
     var isCapturing: Bool { enabled.isSet && connected.isSet }
+
+    /// The operator's switch on its own, regardless of the connection.
+    var isEnabled: Bool { enabled.isSet }
 
     init(host: String, port: UInt16) {
         self.host = host
@@ -155,8 +161,22 @@ final class KeyTap {
 
         let keycode = Int(event.getIntegerValueField(.keyboardEventKeycode))
 
-        // 53 is Escape: the panic key. Never swallowed, always stops capture.
+        // 53 is Escape. On its own it is the panic key; with Command it turns
+        // capture back on. Two separate gestures rather than one toggle, so the
+        // resulting state never depends on what the state was.
         if keycode == 53 {
+            if event.flags.contains(.maskCommand) {
+                if !enabled.isSet {
+                    enabled.set(true)
+                    notify()
+                    print("Overlay: command-escape, key capture re-enabled")
+                }
+                // Swallowed: this is our own control gesture, and letting it
+                // reach the focused app would be sloppy. It is the one Command
+                // combination that does not pass through.
+                return nil
+            }
+
             if enabled.isSet {
                 enabled.set(false)
                 notify()
