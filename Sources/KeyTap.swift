@@ -15,7 +15,7 @@
 //       bar always work.
 //    3. Escape is never swallowed and always disables capture. It is the panic
 //       key, and it is worth knowing before you need it. Command-Escape turns
-//       capture back on.
+//       capture back on, and Command-Left/Right step between scenes.
 //
 //  The tap also runs its own thread and run loop. Sharing the main run loop with
 //  WKWebView means a render stall can trip kCGEventTapDisabledByTimeout, and
@@ -186,6 +186,15 @@ final class KeyTap {
         }
 
         let flags = event.flags
+
+        // 123 and 124 are Left and Right. With Command held they step the scene
+        // runner through scenes/ in filename order. Gated on capture being live,
+        // so Command-arrow behaves normally whenever a scene is not running.
+        if flags.contains(.maskCommand), keycode == 123 || keycode == 124, isCapturing {
+            transmit(command: keycode == 124 ? "scene_next" : "scene_prev")
+            return nil
+        }
+
         if flags.contains(.maskCommand) || flags.contains(.maskControl) {
             return Unmanaged.passUnretained(event)
         }
@@ -210,10 +219,17 @@ final class KeyTap {
         var mods: [String] = []
         if flags.contains(.maskShift) { mods.append("\"shift\"") }
         if flags.contains(.maskAlternate) { mods.append("\"alt\"") }
-        let line = "{\"type\":\"key\",\"keycode\":\(keycode),"
-                 + "\"chars\":\"\(escapeJSON(chars))\","
-                 + "\"mods\":[\(mods.joined(separator: ","))]}\n"
+        transmit("{\"type\":\"key\",\"keycode\":\(keycode),"
+               + "\"chars\":\"\(escapeJSON(chars))\","
+               + "\"mods\":[\(mods.joined(separator: ","))]}\n")
+    }
 
+    private func transmit(command name: String) {
+        print("Overlay: \(name)")
+        transmit("{\"type\":\"command\",\"name\":\"\(escapeJSON(name))\"}\n")
+    }
+
+    private func transmit(_ line: String) {
         // Off the tap thread: a blocking write here would stall input and trip
         // the tap timeout.
         queue.async { [weak self] in

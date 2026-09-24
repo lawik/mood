@@ -80,6 +80,7 @@ Overlay — transparent click-through web layer for macOS
                     (default 127.0.0.1:4040). Needs Accessibility permission.
                     Keys only get swallowed while the runner is connected.
                     Escape disables capture; Command-Escape re-enables it.
+                    Command-Left/Right step through scenes on the runner.
   --check-permission
                     report whether Accessibility is granted, and exit
   --help

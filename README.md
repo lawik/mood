@@ -100,12 +100,18 @@ overlay still needs nothing at all.
 |---|---|
 | **Escape** | disables capture. The panic key: never swallowed, works always. |
 | **Command-Escape** | re-enables capture. |
-| **Command / Control** | never swallowed, so Cmd-Tab, Cmd-Q and the menu bar always work. |
+| **Command-Left / Right** | step to the previous / next scene on the runner. |
+| **Command / Control** | otherwise never swallowed, so Cmd-Tab, Cmd-Q and the menu bar always work. |
 
 Two gestures rather than one toggle, so the resulting state never depends on
 what the state was — worth something when you are reaching for it in a hurry.
-Command-Escape is the single Command combination that does not pass through,
-since it is the overlay's own control gesture.
+
+Command-Escape and Command-Left/Right are the only Command combinations that do
+not pass through, being the overlay's own control gestures. The arrows are
+further gated on capture being live, so they behave normally whenever a scene is
+not running — otherwise the overlay would eat a shortcut that plenty of apps use
+for navigation. The runner steps through `scenes/` in filename order and runs the
+outgoing scene's teardown on the way out.
 
 Keys are only swallowed **while the runner is connected**. If the runner dies or
 was never started, every key passes through untouched — a tap that suppressed
