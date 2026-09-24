@@ -86,7 +86,7 @@ independently per screen — they are not frame-synced with each other.
 
 `--capture-keys [host:port]` makes the overlay swallow key presses and forward
 them to a scene runner as newline-delimited JSON over TCP (default
-`127.0.0.1:4040`). An actor taps any keys; the runner decides what actually gets
+`127.0.0.1:4041`). An actor taps any keys; the runner decides what actually gets
 typed.
 
     ./run.sh                    # capture is on by default
@@ -151,7 +151,7 @@ Info.plist in `build.sh`.
 
 ## Where the visuals come from
 
-scener's LiveView at `http://localhost:4000/overlay`, so scene state and the set
+scener's LiveView at `http://localhost:4040/overlay`, so scene state and the set
 dressing are driven by one process. `OVERLAY_URL` points it elsewhere.
 
 The leaves used to be a local page here and now live in scener, which owns the

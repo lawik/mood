@@ -63,12 +63,12 @@ func listScreens() -> Never {
     exit(0)
 }
 
-let defaultOverlayURL = "http://localhost:4000/overlay"
+let defaultOverlayURL = "http://localhost:4040/overlay"
 
 private let usage = """
 Overlay — transparent click-through web layer for macOS
 
-  --url <url>       page to display (default: http://localhost:4000/overlay)
+  --url <url>       page to display (default: http://localhost:4040/overlay)
   --file <path>     a local HTML file instead of a URL
   --watch           reload whenever anything beside the HTML file changes
   --level <name>    shield | screensaver | menubar | floating | normal | <int>
@@ -79,7 +79,7 @@ Overlay — transparent click-through web layer for macOS
   --tint            paint the window faintly red to verify its extent
   --capture-keys [host:port]
                     swallow key presses and forward them to a scene runner
-                    (default 127.0.0.1:4040). Needs Accessibility permission.
+                    (default 127.0.0.1:4041). Needs Accessibility permission.
                     Keys only get swallowed while the runner is connected.
                     Escape disables capture; Command-Escape re-enables it.
                     Command-Left/Right step through scenes on the runner.
@@ -140,7 +140,7 @@ func parseConfig() -> Config {
         case "--list-screens":
             listScreens()
         case "--capture-keys":
-            var spec = "127.0.0.1:4040"
+            var spec = "127.0.0.1:4041"
             if let next = args.first, !next.hasPrefix("-") {
                 spec = next
                 args.removeFirst()

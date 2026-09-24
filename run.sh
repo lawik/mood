@@ -7,7 +7,7 @@
 #
 # No flags are needed for a show. The overlay is scener's LiveView
 # (OVERLAY_URL to point elsewhere) and the key tap is armed against the scene
-# runner on 127.0.0.1:4040.
+# runner on 127.0.0.1:4041.
 #
 # Arming the tap is safe with nothing listening: keys are only swallowed while
 # the runner is connected, so until scener is up the keyboard behaves as
@@ -16,7 +16,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP="$ROOT/build/Overlay.app"
-OVERLAY_URL="${OVERLAY_URL:-http://localhost:4000/overlay}"
+OVERLAY_URL="${OVERLAY_URL:-http://localhost:4040/overlay}"
 LOG="/tmp/overlay-$USER.log"
 
 [[ -x "$APP/Contents/MacOS/Overlay" ]] || "$ROOT/build.sh"
