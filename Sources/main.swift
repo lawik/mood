@@ -33,6 +33,7 @@ struct Config {
     var level: NSWindow.Level
     var target: ScreenTarget
     var tint: Bool
+    var captureKeys: (host: String, port: UInt16)?
 }
 
 private func windowLevel(named name: String) -> NSWindow.Level? {
@@ -74,6 +75,13 @@ Overlay — transparent click-through web layer for macOS
                     index, or part of a display name (case-insensitive)
   --list-screens    print the attached displays and exit
   --tint            paint the window faintly red to verify its extent
+  --capture-keys [host:port]
+                    swallow key presses and forward them to a scene runner
+                    (default 127.0.0.1:4040). Needs Accessibility permission.
+                    Keys only get swallowed while the runner is connected;
+                    Escape always passes through and disables capture.
+  --check-permission
+                    report whether Accessibility is granted, and exit
   --help
 
 Ctrl-C in this terminal quits, as does Quit in the ◆ menu bar item.
@@ -85,6 +93,7 @@ func parseConfig() -> Config {
     var level: NSWindow.Level = .screenSaver
     var target: ScreenTarget = .all
     var tint = false
+    var captureKeys: (host: String, port: UInt16)? = nil
 
     var args = Array(CommandLine.arguments.dropFirst())
     while let arg = args.first {
@@ -127,8 +136,48 @@ func parseConfig() -> Config {
             }
         case "--list-screens":
             listScreens()
+        case "--capture-keys":
+            var spec = "127.0.0.1:4040"
+            if let next = args.first, !next.hasPrefix("-") {
+                spec = next
+                args.removeFirst()
+            }
+            let parts = spec.split(separator: ":")
+            let host = parts.count > 1 ? String(parts[0]) : "127.0.0.1"
+            let rawPort = parts.count > 1 ? parts[1] : parts[0]
+            guard let portValue = UInt16(rawPort) else {
+                FileHandle.standardError.write("Overlay: --capture-keys wants [host:]port\n".data(using: .utf8)!)
+                exit(2)
+            }
+            captureKeys = (host, portValue)
         case "--tint":
             tint = true
+        case "--check-permission":
+            // The exact check macOS makes before it will hand out an event tap.
+            // Deliberately does not create a tap: an enabled tap with no run
+            // loop attached would sit in the event stream until it timed out.
+            if AXIsProcessTrusted() {
+                print("Accessibility: granted. Key capture will work.")
+                exit(0)
+            }
+            print("""
+                  Accessibility: NOT granted for this process.
+
+                  If Overlay.app is already listed and enabled in System Settings,
+                  the likely cause is how it was launched. macOS attributes
+                  Accessibility to the *responsible* process, and a binary exec'd
+                  from a terminal is attributed to the terminal, not to the app.
+                  Launch through LaunchServices instead:
+
+                    open -a \(Bundle.main.bundlePath) --args --check-permission
+
+                  ./run.sh does this automatically for --capture-keys.
+
+                  Otherwise, add it under
+                  System Settings > Privacy & Security > Accessibility:
+                    \(Bundle.main.bundlePath)
+                  """)
+            exit(1)
         case "--help", "-h":
             print(usage)
             exit(0)
@@ -146,7 +195,8 @@ func parseConfig() -> Config {
                   watchRoot: (watch && resolved.isFileURL) ? resolved.deletingLastPathComponent() : nil,
                   level: level,
                   target: target,
-                  tint: tint)
+                  tint: tint,
+                  captureKeys: captureKeys)
 }
 
 // MARK: - Window
@@ -257,6 +307,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var surfaces: [OverlaySurface] = []
     private var statusItem: NSStatusItem?
     private var watchTimer: DispatchSourceTimer?
+    private var keyTap: KeyTap?
+    private var captureItem: NSMenuItem?
     private var lastSeenChange: Date = .distantPast
     private var hidden = false
 
@@ -277,6 +329,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             selector: #selector(screenParametersChanged),
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil)
+
+        if let capture = config.captureKeys {
+            let tap = KeyTap(host: capture.host, port: capture.port)
+            tap.onStateChange = { [weak self] active in
+                self?.captureItem?.title = active ? "Key capture: ON" : "Key capture: idle"
+            }
+            tap.start()
+            keyTap = tap
+        }
 
         if let root = config.watchRoot {
             lastSeenChange = Self.newestModification(under: root)
@@ -346,6 +407,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Reload", action: #selector(reload), keyEquivalent: "r")
+        if config.captureKeys != nil {
+            let capture = NSMenuItem(title: "Key capture: idle",
+                                     action: #selector(toggleCapture),
+                                     keyEquivalent: "")
+            menu.addItem(capture)
+            captureItem = capture
+        }
         let toggle = NSMenuItem(title: "Hide Overlay", action: #selector(toggleVisible), keyEquivalent: "h")
         menu.addItem(toggle)
         menu.addItem(.separator())
@@ -364,6 +432,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hidden ? surfaces.forEach { $0.panel.orderOut(nil) }
                : surfaces.forEach { $0.show() }
         sender.title = hidden ? "Show Overlay" : "Hide Overlay"
+    }
+
+    @objc private func toggleCapture() {
+        guard let keyTap else { return }
+        keyTap.setEnabled(!keyTap.isCapturing)
     }
 
     @objc private func quit() {
@@ -405,6 +478,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 // MARK: - Entry point
+
+// Line-buffer stdout: it is block-buffered whenever it is not a terminal, and
+// this app is usually launched with its output going to a file or a pipe.
+setvbuf(stdout, nil, _IOLBF, 0)
 
 let app = NSApplication.shared
 let delegate = AppDelegate(config: parseConfig())
