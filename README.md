@@ -91,10 +91,15 @@ Extended mode — not mirrored — gives each display its own overlay. Mirrored
 displays share one coordinate space and one composited image, so nothing can
 appear on one and not the other; extended makes them genuinely separate.
 
-    ./run.sh --url-on primary=http://localhost:4040/prompter
+`./run.sh` does this for you: with two or more displays the primary gets the
+prompter (`PROMPTER_URL`) and the rest get the set dressing (`OVERLAY_URL`).
+With one display there is nowhere private to put the prompter, so it shows the
+performance and says which it chose.
 
-The performer's display gets the prompter; everything else gets the set
-dressing from `--url`. First matching `--url-on` wins.
+To set it by hand, `--url-on <spec>=<url>` overrides the page for one display,
+repeatable, first match wins:
+
+    ./run.sh --url-on primary=http://localhost:4040/prompter
 
 Every page also receives the display it landed on as query parameters, so one
 page can serve both roles without `--url-on` at all:

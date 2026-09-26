@@ -17,6 +17,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP="$ROOT/build/Overlay.app"
 OVERLAY_URL="${OVERLAY_URL:-http://localhost:4040/overlay}"
+PROMPTER_URL="${PROMPTER_URL:-http://localhost:4040/prompter}"
 LOG="/tmp/overlay-$USER.log"
 
 [[ -x "$APP/Contents/MacOS/Overlay" ]] || "$ROOT/build.sh"
@@ -60,4 +61,16 @@ trap cleanup INT TERM EXIT
 tail -f "$LOG" &
 TAIL_PID=$!
 
-overlay --url "$OVERLAY_URL" --capture-keys "$@"
+# With two displays the performer's one gets the prompter and the projected one
+# gets the set dressing. With one display there is nowhere private to put the
+# prompter, so show the performance and say so rather than silently hiding it.
+DISPLAYS="$("$APP/Contents/MacOS/Overlay" --list-screens | grep -c '^\[' || true)"
+ROUTING=()
+if [[ "${DISPLAYS:-1}" -gt 1 ]]; then
+  ROUTING=(--url-on "primary=$PROMPTER_URL")
+  echo "run.sh: $DISPLAYS displays — prompter on the primary, performance on the rest"
+else
+  echo "run.sh: one display — showing the performance; connect a second for the prompter"
+fi
+
+overlay --url "$OVERLAY_URL" "${ROUTING[@]}" --capture-keys "$@"
