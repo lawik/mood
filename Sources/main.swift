@@ -34,6 +34,11 @@ struct Config {
     var target: ScreenTarget
     var tint: Bool
     var captureKeys: (host: String, port: UInt16)?
+
+    /// Per-display page overrides, first match wins. Extended mode puts a
+    /// different overlay on each display: the performer's prompter on the one
+    /// they can see, the set dressing on the one the audience can see.
+    var perScreen: [(target: ScreenTarget, url: URL)] = []
 }
 
 private func windowLevel(named name: String) -> NSWindow.Level? {
@@ -44,6 +49,18 @@ private func windowLevel(named name: String) -> NSWindow.Level? {
     case "floating":    return .floating
     case "normal":      return .normal
     default:            return Int(name).map(NSWindow.Level.init(rawValue:))
+    }
+}
+
+/// One spelling of a display, shared by --screen and --url-on.
+func screenTarget(_ raw: String) -> ScreenTarget {
+    switch raw.lowercased() {
+    case "all":             return .all
+    case "primary", "main": return .primary
+    default:
+        // An index if it parses as one, otherwise match on display name, which
+        // survives reconnecting a projector where an index may not.
+        return Int(raw).map(ScreenTarget.index) ?? .name(raw)
     }
 }
 
@@ -77,6 +94,10 @@ Overlay — transparent click-through web layer for macOS
                     index, or part of a display name (case-insensitive)
   --list-screens    print the attached displays and exit
   --tint            paint the window faintly red to verify its extent
+  --url-on <spec>=<url>
+                    a different page on one display, repeatable. <spec> is the
+                    same as --screen: primary, an index, or part of a name.
+                    e.g. --url-on primary=http://localhost:4040/prompter
   --capture-keys [host:port]
                     swallow key presses and forward them to a scene runner
                     (default 127.0.0.1:4041). Needs Accessibility permission.
@@ -97,6 +118,7 @@ func parseConfig() -> Config {
     var target: ScreenTarget = .all
     var tint = false
     var captureKeys: (host: String, port: UInt16)? = nil
+    var perScreen: [(target: ScreenTarget, url: URL)] = []
 
     var args = Array(CommandLine.arguments.dropFirst())
     while let arg = args.first {
@@ -128,17 +150,18 @@ func parseConfig() -> Config {
             }
             level = l
         case "--screen":
-            let raw = value("--screen")
-            switch raw.lowercased() {
-            case "all":                 target = .all
-            case "primary", "main":     target = .primary
-            default:
-                // An index if it parses as one, otherwise match on display name,
-                // which survives reconnecting a projector where an index may not.
-                target = Int(raw).map(ScreenTarget.index) ?? .name(raw)
-            }
+            target = screenTarget(value("--screen"))
         case "--list-screens":
             listScreens()
+        case "--url-on":
+            let raw = value("--url-on")
+            guard let split = raw.firstIndex(of: "="),
+                  let overrideURL = URL(string: String(raw[raw.index(after: split)...])),
+                  overrideURL.scheme != nil else {
+                FileHandle.standardError.write("Overlay: --url-on wants <spec>=<url>\n".data(using: .utf8)!)
+                exit(2)
+            }
+            perScreen.append((screenTarget(String(raw[..<split])), overrideURL))
         case "--capture-keys":
             var spec = "127.0.0.1:4041"
             if let next = args.first, !next.hasPrefix("-") {
@@ -199,7 +222,8 @@ func parseConfig() -> Config {
                   level: level,
                   target: target,
                   tint: tint,
-                  captureKeys: captureKeys)
+                  captureKeys: captureKeys,
+                  perScreen: perScreen)
 }
 
 // MARK: - Window
@@ -220,7 +244,7 @@ final class OverlaySurface: NSObject, WKNavigationDelegate {
     // that failed to load once should not stay a WebKit error page for the rest
     // of the night, so failures retry until they stop failing. Same reasoning as
     // the key tap's reconnect: start order should not matter.
-    private var source: Config?
+    private var page: URL?
     private var retryDelay: TimeInterval = 0.5
     private var retrying = false
 
@@ -282,26 +306,30 @@ final class OverlaySurface: NSObject, WKNavigationDelegate {
         super.init()
     }
 
-    func load(_ config: Config) {
-        source = config
+    func load(_ url: URL) {
+        page = url
         webView.navigationDelegate = self
 
-        if config.source.isFileURL {
-            webView.loadFileURL(config.source,
-                                allowingReadAccessTo: config.source.deletingLastPathComponent())
+        if url.isFileURL {
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
         } else {
-            webView.load(URLRequest(url: config.source))
+            webView.load(URLRequest(url: url))
         }
+    }
+
+    func reload() {
+        guard let page else { return }
+        load(page)
     }
 
     /// A plain re-load re-fetches the HTML but serves CSS and JS out of
     /// WebKit's cache, so edits appear to do nothing. Clearing the cache first
     /// is what makes --watch actually live.
-    func reload(_ config: Config) {
+    func reloadIgnoringCache() {
         let types: Set<String> = [WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeDiskCache]
         webView.configuration.websiteDataStore
             .removeData(ofTypes: types, modifiedSince: .distantPast) { [weak self] in
-                self?.load(config)
+                self?.reload()
             }
     }
 
@@ -329,10 +357,10 @@ final class OverlaySurface: NSObject, WKNavigationDelegate {
         // -999 is a navigation we cancelled ourselves by starting another one.
         // Retrying on that would chase its own tail.
         if (error as NSError).code == NSURLErrorCancelled { return }
-        guard let config = source else { return }
+        guard let url = page else { return }
 
         if !retrying {
-            print("Overlay: \(config.source.absoluteString) did not load "
+            print("Overlay: \(url.absoluteString) did not load "
                 + "(\(error.localizedDescription)); retrying until it does")
             retrying = true
         }
@@ -340,7 +368,7 @@ final class OverlaySurface: NSObject, WKNavigationDelegate {
         let delay = retryDelay
         retryDelay = min(retryDelay * 2, 5)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            self?.load(config)
+            self?.load(url)
         }
     }
 
@@ -403,8 +431,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             print("Overlay: watching \(root.path) for changes")
         }
 
-        let where_ = config.source.isFileURL ? config.source.path : config.source.absoluteString
-        print("Overlay: showing \(where_) on \(surfaces.count) display(s) at level \(config.level.rawValue)")
+        print("Overlay: \(surfaces.count) display(s) at level \(config.level.rawValue)")
     }
 
     // MARK: Surfaces
@@ -441,12 +468,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func rebuildSurfaces() {
         surfaces.forEach { $0.close() }
+        let all = NSScreen.screens
+
         surfaces = targetScreens().map { screen in
+            let index = all.firstIndex(of: screen) ?? 0
+            let url = page(for: screen, at: index)
             let surface = OverlaySurface(screen: screen, config: config)
-            surface.load(config)
+            surface.load(url)
             if !hidden { surface.show() }
+            print("Overlay: [\(index)] \(screen.localizedName) -> \(url.absoluteString)")
             return surface
         }
+    }
+
+    /// Which page a given display shows. First matching --url-on wins, so the
+    /// performer's display can carry a prompter while the projected one carries
+    /// the set dressing.
+    private func page(for screen: NSScreen, at index: Int) -> URL {
+        let chosen = config.perScreen.first { matches(screen, at: index, $0.target) }?.url
+        return tagged(chosen ?? config.source, screen: screen, at: index)
+    }
+
+    private func matches(_ screen: NSScreen, at index: Int, _ target: ScreenTarget) -> Bool {
+        switch target {
+        case .all: return true
+        case .primary: return index == 0
+        case .index(let wanted): return wanted == index
+        case .name(let needle):
+            return screen.localizedName.range(of: needle, options: .caseInsensitive) != nil
+        }
+    }
+
+    /// Tell the page which display it landed on, so a single page can also serve
+    /// both roles without needing --url-on at all.
+    private func tagged(_ url: URL, screen: NSScreen, at index: Int) -> URL {
+        guard !url.isFileURL,
+              var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+
+        var items = parts.queryItems ?? []
+        items.append(URLQueryItem(name: "screen", value: String(index)))
+        items.append(URLQueryItem(name: "primary", value: index == 0 ? "true" : "false"))
+        items.append(URLQueryItem(name: "display", value: screen.localizedName))
+        parts.queryItems = items
+        return parts.url ?? url
     }
 
     /// Plugging in a projector, changing resolution or rearranging displays all
@@ -482,7 +546,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func reload() {
-        surfaces.forEach { $0.reload(config) }
+        surfaces.forEach { $0.reloadIgnoringCache() }
     }
 
     @objc private func toggleVisible(_ sender: NSMenuItem) {

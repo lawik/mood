@@ -53,6 +53,9 @@ Keyboard is the exception, and only on request. `--capture-keys` does use a
     --screen <spec>   which displays to cover: all (the default), primary, an
                       index, or part of a display name (case-insensitive)
     --list-screens    print the attached displays and exit
+    --url-on <spec>=<url>
+                      a different page on one display, repeatable; <spec> is
+                      the same as --screen
     --tint            paint the window faintly red, to verify its extent
 
 `--level screensaver` (the default) covers everything, including open menus.
@@ -81,6 +84,22 @@ Plugging a projector in, unplugging it, or changing resolution fires
 `didChangeScreenParametersNotification` and the windows are rebuilt against the
 new arrangement. Each display gets its own web view, so animation runs
 independently per screen — they are not frame-synced with each other.
+
+### A different overlay per display
+
+Extended mode — not mirrored — gives each display its own overlay. Mirrored
+displays share one coordinate space and one composited image, so nothing can
+appear on one and not the other; extended makes them genuinely separate.
+
+    ./run.sh --url-on primary=http://localhost:4040/prompter
+
+The performer's display gets the prompter; everything else gets the set
+dressing from `--url`. First matching `--url-on` wins.
+
+Every page also receives the display it landed on as query parameters, so one
+page can serve both roles without `--url-on` at all:
+
+    /overlay?screen=1&primary=false&display=DENON-AVAMP
 
 ## Key capture
 
